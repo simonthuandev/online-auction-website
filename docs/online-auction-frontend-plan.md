@@ -19,7 +19,7 @@
 - **Definition of Done (mọi issue Frontend):**
   1. Đúng tính năng cốt lõi, gọi đúng endpoint và khớp 100% schema trong `contracts/openapi/*.json` & `contracts/socket.json` của Backend.
   2. Không gọi `axios` trực tiếp trong component UI; mọi giao tiếp mạng đi qua `src/api/*.api.ts` và custom hooks trong `src/features/*/hooks/`.
-  3. Xử lý đủ 4 trạng thái UI: `loading`, `empty`, `error` (hiển thị thông điệp thân thiện từ error envelope của BE), `success`.
+  3. Xử lý đủ 4 trạng thái UI: `loading`, `empty` (hiển thị component `EmptyState` với text "Không có dữ liệu" hoặc mô tả ngữ cảnh phù hợp), `error` (bắt lỗi mạng, timeout, hoặc error envelope của BE; có nút Thử lại), `success`. Tuyệt đối áp dụng lập trình phòng thủ (null safety, `?.`, `??`), không để văng app khi dữ liệu API null/undefined hoặc khi Backend chưa bật.
   4. Không hard-code URL/secret; cấu hình qua `.env` (`.env.example` được cập nhật nếu thêm biến mới).
   5. Chạy xanh `npm run typecheck`, `npm run lint`, và `npm run build` (Web) / khởi chạy không lỗi trên Emulator hoặc Expo Go (Mobile).
 - **Thiết kế giao diện (UI/UX):** Do từng owner chủ động thiết kế (màu sắc, bố cục), miễn đảm bảo đủ tính năng cốt lõi, dễ thao tác (responsive trên Web, chuẩn safe-area/keyboard trên Mobile) và đạt toàn bộ tiêu chí nghiệm thu của từng issue.
@@ -92,6 +92,28 @@ src/
     - CHECK constraint vi phạm → `400 INVALID_REQUEST` (ví dụ: `startingPrice <= 0`, `bidIncrement <= 0`, `endTime <= startTime`).
     - Bản ghi không tìm thấy → `404 NOT_FOUND`.
     - Backend trả Error envelope chuẩn: `{ "code": "...", "message": "...", "requestId": "..." }`. FE hiển thị trực tiếp `error.response.data.message`.
+
+### 2.1 Quy chuẩn Lập trình Phòng thủ & Độc lập Backend (Defensive UI, Mock Fixtures & Crash Prevention)
+
+Nhằm đảm bảo Web và Mobile có thể phát triển giao diện hoàn toàn độc lập, mượt mà ngay cả khi Backend đang kiểm thử, chưa khởi động Docker hoặc API trả dữ liệu thiếu/rỗng:
+
+1. **Nguyên tắc "Zero-Crash" (Null Safety & Safe Navigation):**
+   - **Luôn dùng Optional Chaining (`?.`) và Nullish Coalescing (`??`)** khi render dữ liệu từ API:
+     - **Chuỗi văn bản:** `item.title ?? 'Chưa có tiêu đề'`, `user.name ?? 'Người dùng'`, `product.description || 'Chưa có mô tả'`.
+     - **Mảng danh sách:** Luôn fallback mảng rỗng: `(data?.items ?? []).map(...)`. Tuyệt đối không viết `data.items.map(...)` dẫn đến lỗi trắng trang `TypeError: Cannot read properties of undefined (reading 'map')`.
+     - **Giá trị số / Tiền tệ:** Không truyền trực tiếp giá trị chưa kiểm tra vào hàm format tiền: dùng `formatVnd(price ?? '0')` hoặc hiển thị `"0 ₫"` / `"Chưa có giá"`.
+     - **Ngày tháng / Thời gian:** Kiểm tra `time ? formatLocalTime(time) : 'Chưa xác định'`, không để hàm parse date nhận `null/undefined` gây lỗi runtime `Invalid Date`.
+     - **Ảnh & Avatar & Thumbnail:** Luôn có ảnh placeholder mặc định khi `thumbnail` hoặc `avatarUrl` là `null`; gắn handler `onError` để fallback ảnh mặc định nếu URL ảnh bị hỏng/404.
+2. **Chuẩn hóa 4 trạng thái giao diện (Loading, Empty, Error, Success):**
+   - **Loading State:** Sử dụng Skeleton hoặc Spinner mượt mà; tuyệt đối không để màn hình trống trơn khi đang nạp dữ liệu.
+   - **Empty State:** Khi danh sách rỗng (`items.length === 0`) hoặc object không có dữ liệu, hiển thị component `EmptyState` dùng chung với icon trực quan và thông điệp thân thiện: *"Không có dữ liệu"*, *"Chưa có sản phẩm nào"*, *"Chưa có lượt đặt giá nào"*, v.v. (kèm nút thao tác bổ sung nếu có).
+   - **Error / Offline State:** Khi Backend chưa bật, mất mạng (`ERR_NETWORK`, `ECONNREFUSED`) hoặc server lỗi (`500/502/503`), không throw unhandled error. Hiển thị thông báo thân thiện: *"Không thể kết nối đến máy chủ. Vui lòng kiểm tra kết nối mạng hoặc thử lại sau"* kèm nút **"Thử lại" (Retry)** gọi lại `refetch()`.
+   - **Success State:** Render dữ liệu với đầy đủ các fallback an toàn.
+3. **Chiến lược Mock Fixtures (Hỗ trợ code UI độc lập không cần bật Backend):**
+   - Mỗi domain tạo sẵn file mock fixtures nhẹ (`src/features/<feature>/mocks/<feature>.mock.ts`) tuân thủ đúng schema trong `api.generated.ts`.
+   - Khi Backend chưa chạy hoặc dev muốn code giao diện nhanh: có thể dùng mock data làm `initialData` / `placeholderData` trong TanStack Query hoặc trả về từ service mock, đảm bảo team xem được toàn bộ layout, tương tác UI và responsive mà không bị phụ thuộc vào việc bật Docker stack backend.
+4. **ErrorBoundary bảo vệ cấp độ Trang:**
+   - Mọi Route chính (Web) và Screen chính (Mobile) phải được bọc trong `ErrorBoundary`. Nếu một component con gặp lỗi render bất ngờ, ErrorBoundary sẽ hiển thị màn hình fallback cứu hộ thay vì làm sập toàn bộ ứng dụng.
 
 ---
 
