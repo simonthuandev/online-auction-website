@@ -1,6 +1,6 @@
 import { createSlice, type PayloadAction } from '@reduxjs/toolkit';
-import type { User } from '@/contracts/api.generated';
-import { tokenStorage } from '@/lib/tokenStorage';
+import type { User } from '../contracts/api.generated.ts';
+import { tokenStorage } from '../lib/tokenStorage.ts';
 
 export interface AuthState {
   user: User | null;

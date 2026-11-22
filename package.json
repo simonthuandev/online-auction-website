@@ -8,7 +8,8 @@
     "build": "tsc -b && vite build",
     "typecheck": "tsc -b",
     "contracts:sync": "node scripts/sync-contracts.mjs",
-    "test:platform": "node --experimental-strip-types scripts/test-all.mjs",
+    "test:platform": "node --experimental-strip-types scripts/test-all.mjs && node --experimental-strip-types scripts/test-auth.mjs",
+    "test:auth": "node --experimental-strip-types scripts/test-auth.mjs",
     "lint": "eslint .",
     "preview": "vite preview"
   },
