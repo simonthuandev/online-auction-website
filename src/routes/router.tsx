@@ -5,6 +5,7 @@ import { ProtectedRoute, RoleRoute, AnonymousRoute } from '@/routes/Guards';
 // Feature Pages
 import { HomePage } from '@/features/home/HomePage';
 import { ProductListPage } from '@/features/products/ProductListPage';
+import { ProductDetailPage } from '@/features/products/ProductDetailPage';
 import { AuctionListPage } from '@/features/auctions/AuctionListPage';
 import { LoginPage } from '@/features/auth/LoginPage';
 import { RegisterPage } from '@/features/auth/RegisterPage';
@@ -28,6 +29,10 @@ export const router = createBrowserRouter([
       {
         path: 'products',
         element: <ProductListPage />,
+      },
+      {
+        path: 'products/:id',
+        element: <ProductDetailPage />,
       },
       {
         path: 'auctions',
@@ -86,6 +91,14 @@ export const router = createBrowserRouter([
       },
       {
         path: 'seller/products/new',
+        element: (
+          <RoleRoute allowedRoles={['SELLER', 'ADMIN']}>
+            <SellerProductsPage />
+          </RoleRoute>
+        ),
+      },
+      {
+        path: 'seller/products/:id/edit',
         element: (
           <RoleRoute allowedRoles={['SELLER', 'ADMIN']}>
             <SellerProductsPage />
