@@ -1,8 +1,7 @@
 import React, { useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { useAppDispatch, useAppSelector } from '@/store';
-import { logout } from '@/store/authSlice';
-import { disconnectSockets } from '@/lib/socket';
+import { useAppSelector } from '@/store';
+import { performLogout } from '@/features/auth/services/performLogout';
 import {
   Gavel,
   Search,
@@ -20,12 +19,12 @@ import {
 export const Navbar: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const dispatch = useAppDispatch();
   const { user, isAuthenticated } = useAppSelector((state) => state.auth);
 
   const [searchQuery, setSearchQuery] = useState('');
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [avatarError, setAvatarError] = useState(false);
 
   const isSeller = user?.role === 'SELLER';
   const isAdmin = user?.role === 'ADMIN';
@@ -38,12 +37,10 @@ export const Navbar: React.FC = () => {
     }
   };
 
-  const handleLogout = () => {
-    disconnectSockets();
-    dispatch(logout());
+  const handleLogout = async () => {
     setUserMenuOpen(false);
     setMobileMenuOpen(false);
-    navigate('/login');
+    await performLogout({ callApi: true });
   };
 
   return (
@@ -65,21 +62,19 @@ export const Navbar: React.FC = () => {
             <nav className="hidden md:flex items-center gap-1">
               <Link
                 to="/products"
-                className={`px-3 py-2 rounded-md text-sm font-medium transition ${
-                  location.pathname.startsWith('/products')
+                className={`px-3 py-2 rounded-md text-sm font-medium transition ${location.pathname.startsWith('/products')
                     ? 'bg-indigo-50 text-indigo-700'
                     : 'text-gray-700 hover:bg-gray-100'
-                }`}
+                  }`}
               >
                 Sản phẩm
               </Link>
               <Link
                 to="/auctions"
-                className={`px-3 py-2 rounded-md text-sm font-medium transition ${
-                  location.pathname.startsWith('/auctions')
+                className={`px-3 py-2 rounded-md text-sm font-medium transition ${location.pathname.startsWith('/auctions')
                     ? 'bg-indigo-50 text-indigo-700'
                     : 'text-gray-700 hover:bg-gray-100'
-                }`}
+                  }`}
               >
                 Phiên đấu giá
               </Link>
@@ -89,9 +84,8 @@ export const Navbar: React.FC = () => {
                 <div className="flex items-center gap-1 pl-2 border-l border-gray-200">
                   <Link
                     to="/seller/products"
-                    className={`px-3 py-2 rounded-md text-sm font-medium text-emerald-700 hover:bg-emerald-50 transition ${
-                      location.pathname.startsWith('/seller') ? 'bg-emerald-50 font-semibold' : ''
-                    }`}
+                    className={`px-3 py-2 rounded-md text-sm font-medium text-emerald-700 hover:bg-emerald-50 transition ${location.pathname.startsWith('/seller') ? 'bg-emerald-50 font-semibold' : ''
+                      }`}
                   >
                     Kênh Người Bán
                   </Link>
@@ -108,9 +102,8 @@ export const Navbar: React.FC = () => {
               {isAdmin && (
                 <Link
                   to="/admin"
-                  className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-md text-sm font-medium text-purple-700 hover:bg-purple-50 transition ml-2 ${
-                    location.pathname.startsWith('/admin') ? 'bg-purple-100 font-semibold' : ''
-                  }`}
+                  className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-md text-sm font-medium text-purple-700 hover:bg-purple-50 transition ml-2 ${location.pathname.startsWith('/admin') ? 'bg-purple-100 font-semibold' : ''
+                    }`}
                 >
                   <Shield className="h-4 w-4" /> Quản trị
                 </Link>
@@ -156,10 +149,12 @@ export const Navbar: React.FC = () => {
                   onClick={() => setUserMenuOpen((prev) => !prev)}
                   className="flex items-center gap-2 p-1.5 rounded-full hover:bg-gray-100 transition focus:outline-hidden"
                 >
-                  {user?.avatarUrl ? (
+                  {user?.avatarUrl && !avatarError ? (
                     <img
+                      key={user.avatarUrl}
                       src={user.avatarUrl}
-                      alt={user.name}
+                      alt={user.name || 'User'}
+                      onError={() => setAvatarError(true)}
                       className="h-8 w-8 rounded-full object-cover border border-gray-200"
                     />
                   ) : (
@@ -171,13 +166,12 @@ export const Navbar: React.FC = () => {
                     {user?.name || user?.email}
                   </span>
                   <span
-                    className={`text-[10px] uppercase font-bold px-1.5 py-0.5 rounded-md hidden sm:inline ${
-                      isAdmin
+                    className={`text-[10px] uppercase font-bold px-1.5 py-0.5 rounded-md hidden sm:inline ${isAdmin
                         ? 'bg-purple-100 text-purple-700'
                         : isSeller
-                        ? 'bg-emerald-100 text-emerald-700'
-                        : 'bg-blue-100 text-blue-700'
-                    }`}
+                          ? 'bg-emerald-100 text-emerald-700'
+                          : 'bg-blue-100 text-blue-700'
+                      }`}
                   >
                     {user?.role || 'USER'}
                   </span>
@@ -323,6 +317,52 @@ export const Navbar: React.FC = () => {
                   Quản trị Admin
                 </Link>
               )}
+
+              {/* Mobile Auth Links */}
+              <div className="pt-2 border-t border-gray-100">
+                {isAuthenticated ? (
+                  <>
+                    <Link
+                      to="/profile"
+                      onClick={() => setMobileMenuOpen(false)}
+                      className="px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded-md flex items-center gap-2"
+                    >
+                      <UserIcon className="h-4 w-4" /> Hồ sơ cá nhân ({user?.name})
+                    </Link>
+                    <Link
+                      to="/orders"
+                      onClick={() => setMobileMenuOpen(false)}
+                      className="px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded-md flex items-center gap-2"
+                    >
+                      <ShoppingBag className="h-4 w-4" /> Đơn hàng của tôi
+                    </Link>
+                    <button
+                      type="button"
+                      onClick={handleLogout}
+                      className="w-full text-left px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-50 rounded-md flex items-center gap-2"
+                    >
+                      <LogOut className="h-4 w-4" /> Đăng xuất
+                    </button>
+                  </>
+                ) : (
+                  <div className="flex gap-2 p-2">
+                    <Link
+                      to="/login"
+                      onClick={() => setMobileMenuOpen(false)}
+                      className="flex-1 text-center py-2 text-sm font-medium text-gray-700 border border-gray-300 rounded-lg"
+                    >
+                      Đăng nhập
+                    </Link>
+                    <Link
+                      to="/register"
+                      onClick={() => setMobileMenuOpen(false)}
+                      className="flex-1 text-center py-2 text-sm font-medium bg-indigo-600 text-white rounded-lg"
+                    >
+                      Đăng ký
+                    </Link>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         )}

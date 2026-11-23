@@ -1,7 +1,8 @@
 import React from 'react';
-import { Navigate, Outlet, useLocation, Link } from 'react-router-dom';
+import { Navigate, Outlet, useLocation, useSearchParams, Link } from 'react-router-dom';
 import { useAppSelector } from '@/store';
 import type { UserRole } from '@/contracts/api.generated';
+import { getSafeRedirectUrl } from '@/lib/redirect';
 import { ShieldAlert, ArrowLeft } from 'lucide-react';
 
 export interface ProtectedRouteProps {
@@ -10,7 +11,7 @@ export interface ProtectedRouteProps {
 
 /**
  * Route guard requiring the user to be authenticated.
- * If not authenticated, redirects to /login and saves current location.
+ * If not authenticated, redirects to /login?redirect=... and preserves location in state.
  */
 export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
   const { isAuthenticated, isLoading } = useAppSelector((state) => state.auth);
@@ -25,7 +26,9 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
   }
 
   if (!isAuthenticated) {
-    return <Navigate to="/login" state={{ from: location }} replace />;
+    const currentPath = `${location.pathname}${location.search || ''}`;
+    const redirectParam = encodeURIComponent(currentPath);
+    return <Navigate to={`/login?redirect=${redirectParam}`} state={{ from: location }} replace />;
   }
 
   return children ? <>{children}</> : <Outlet />;
@@ -53,7 +56,9 @@ export const RoleRoute: React.FC<RoleRouteProps> = ({ allowedRoles, children }) 
   }
 
   if (!isAuthenticated) {
-    return <Navigate to="/login" state={{ from: location }} replace />;
+    const currentPath = `${location.pathname}${location.search || ''}`;
+    const redirectParam = encodeURIComponent(currentPath);
+    return <Navigate to={`/login?redirect=${redirectParam}`} state={{ from: location }} replace />;
   }
 
   const currentRole = user?.role;
@@ -91,15 +96,19 @@ export interface AnonymousRouteProps {
 
 /**
  * Route guard for auth pages (Login, Register).
- * Redirects already authenticated users back to home or the previous page.
+ * Redirects already authenticated users back to destination or home.
  */
 export const AnonymousRoute: React.FC<AnonymousRouteProps> = ({ children }) => {
   const { isAuthenticated } = useAppSelector((state) => state.auth);
   const location = useLocation();
-  const from = (location.state as { from?: Location })?.from?.pathname || '/';
+  const [searchParams] = useSearchParams();
+
+  const redirectParam = searchParams.get('redirect');
+  const fromState = (location.state as { from?: Location })?.from?.pathname;
+  const safeTarget = getSafeRedirectUrl(redirectParam || fromState, '/');
 
   if (isAuthenticated) {
-    return <Navigate to={from} replace />;
+    return <Navigate to={safeTarget} replace />;
   }
 
   return children ? <>{children}</> : <Outlet />;

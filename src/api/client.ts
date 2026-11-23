@@ -34,7 +34,7 @@ export class ApiError extends Error {
 
 // Callbacks for auth events (e.g., syncing Redux state, reconnecting sockets)
 type TokenRefreshCallback = (accessToken: string, refreshToken?: string) => void;
-type AuthFailureCallback = () => void;
+type AuthFailureCallback = (reason?: string) => void;
 
 let tokenRefreshedCallback: TokenRefreshCallback | null = null;
 let authFailureCallback: AuthFailureCallback | null = null;
@@ -82,11 +82,33 @@ apiClient.interceptors.response.use(
 
     // Check if error is 401 Unauthorized
     if (error.response?.status === 401 && originalRequest) {
-      // If this request was already a refresh call or was already retried, fail permanently
+      // 1. If this was a logout call, reject immediately to avoid refresh loops
+      const isLogoutRequest = originalRequest.url?.includes('/api/auth/logout');
+      if (isLogoutRequest) {
+        return Promise.reject(normalizeError(error));
+      }
+
+      // 2. Check if the error explicitly indicates account is locked or inactive
+      const errorData = error.response.data as ApiErrorEnvelope | undefined;
+      const errorMsg = (errorData?.message || '').toLowerCase();
+      const errorCode = (errorData?.code || '').toUpperCase();
+      const isLockedAccount =
+        errorCode === 'ACCOUNT_LOCKED' ||
+        errorCode === 'USER_INACTIVE' ||
+        errorMsg.includes('inactive') ||
+        errorMsg.includes('bị khóa');
+
+      if (isLockedAccount) {
+        tokenStorage.clear();
+        authFailureCallback?.('Tài khoản của bạn đã bị khóa hoặc không còn hoạt động');
+        return Promise.reject(normalizeError(error));
+      }
+
+      // 3. If this request was already a refresh call or was already retried, fail permanently
       const isRefreshRequest = originalRequest.url?.includes('/api/auth/refresh');
       if (isRefreshRequest || originalRequest._retry) {
         tokenStorage.clear();
-        authFailureCallback?.();
+        authFailureCallback?.('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.');
         return Promise.reject(normalizeError(error));
       }
 
@@ -136,7 +158,15 @@ apiClient.interceptors.response.use(
         return apiClient(originalRequest);
       } catch (refreshErr) {
         tokenStorage.clear();
-        authFailureCallback?.();
+        let reason = 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.';
+        if (axios.isAxiosError(refreshErr)) {
+          const rfData = refreshErr.response?.data as ApiErrorEnvelope | undefined;
+          const rfMsg = (rfData?.message || '').toLowerCase();
+          if (rfMsg.includes('inactive') || rfMsg.includes('bị khóa')) {
+            reason = 'Tài khoản của bạn đã bị khóa hoặc không còn hoạt động';
+          }
+        }
+        authFailureCallback?.(reason);
         return Promise.reject(normalizeError(refreshErr));
       }
     }
