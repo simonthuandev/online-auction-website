@@ -14,6 +14,7 @@ import { OrderListPage } from '@/features/orders/OrderListPage';
 import { NotificationPage } from '@/features/notifications/NotificationPage';
 import { AdminDashboardPage } from '@/features/admin/AdminDashboardPage';
 import { SellerProductsPage } from '@/features/products/seller/SellerProductsPage';
+import { ProductFormPage } from '@/features/products/seller/ProductFormPage';
 import { CreateAuctionPage } from '@/features/auctions/seller/CreateAuctionPage';
 import { registerLogoutNavigate } from '@/features/auth/services/performLogout';
 
@@ -84,7 +85,7 @@ export const router = createBrowserRouter([
       {
         path: 'seller/products',
         element: (
-          <RoleRoute allowedRoles={['SELLER', 'ADMIN']}>
+          <RoleRoute allowedRoles={['SELLER']}>
             <SellerProductsPage />
           </RoleRoute>
         ),
@@ -92,16 +93,16 @@ export const router = createBrowserRouter([
       {
         path: 'seller/products/new',
         element: (
-          <RoleRoute allowedRoles={['SELLER', 'ADMIN']}>
-            <SellerProductsPage />
+          <RoleRoute allowedRoles={['SELLER']}>
+            <ProductFormPage />
           </RoleRoute>
         ),
       },
       {
         path: 'seller/products/:id/edit',
         element: (
-          <RoleRoute allowedRoles={['SELLER', 'ADMIN']}>
-            <SellerProductsPage />
+          <RoleRoute allowedRoles={['SELLER']}>
+            <ProductFormPage />
           </RoleRoute>
         ),
       },
