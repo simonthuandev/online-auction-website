@@ -1,5 +1,5 @@
-import React from 'react';
-import { useParams, Link } from 'react-router-dom';
+import React, { useState } from 'react';
+import { useParams, useLocation, Link } from 'react-router-dom';
 import { useProduct } from './hooks/useProducts';
 import { useAppSelector } from '@/store';
 import { ProductGallery } from './components/ProductGallery';
@@ -17,11 +17,16 @@ import {
   RefreshCw,
   Clock,
   ShieldCheck,
+  CheckCircle2,
 } from 'lucide-react';
 
 export const ProductDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
+  const location = useLocation();
   const { user, isAuthenticated } = useAppSelector((state) => state.auth);
+  const [dismissedToast, setDismissedToast] = useState(false);
+
+  const flashToast = (location.state as { toastMessage?: string } | null)?.toastMessage;
 
   const { data: product, isLoading, isError, error, refetch } = useProduct(id);
 
@@ -44,9 +49,9 @@ export const ProductDetailPage: React.FC = () => {
   // 2. Has role SELLER or ADMIN
   // 3. Current user is the owner (product.sellerId === user.id)
   // 4. Product status is either DRAFT or READY
-  const isSellerOrAdmin = user?.role === 'SELLER' || user?.role === 'ADMIN';
+  const isSeller = user?.role === 'SELLER';
   const isOwner = Boolean(
-    isAuthenticated && isSellerOrAdmin && product && user?.id === product.sellerId
+    isAuthenticated && isSeller && product && user?.id === product.sellerId
   );
   const canModify = Boolean(
     isOwner && product && (product.status === 'DRAFT' || product.status === 'READY')
@@ -146,6 +151,26 @@ export const ProductDetailPage: React.FC = () => {
 
   return (
     <div className="space-y-6 sm:space-y-8 pb-16">
+      {/* Success Toast from Redirect (e.g., after creating product) */}
+      {flashToast && !dismissedToast && (
+        <div
+          className="flex items-center justify-between gap-3 p-4 rounded-2xl bg-emerald-50 border border-emerald-200 text-xs sm:text-sm text-emerald-800"
+          role="status"
+        >
+          <div className="flex items-center gap-2.5">
+            <CheckCircle2 className="h-5 w-5 text-emerald-600 shrink-0" />
+            <span>{flashToast}</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setDismissedToast(true)}
+            className="text-xs font-semibold text-emerald-700 hover:underline"
+          >
+            Đóng
+          </button>
+        </div>
+      )}
+
       {/* Breadcrumb Navigation */}
       <nav className="flex items-center gap-1.5 text-xs text-slate-500 overflow-x-auto whitespace-nowrap py-1">
         <Link to="/" className="hover:text-indigo-600 transition">

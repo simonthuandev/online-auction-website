@@ -5,7 +5,34 @@ import type {
   ProductPage,
   CategoryPage,
   ProductStatus,
+  ProductCondition,
 } from '../contracts/api.generated.ts';
+
+export interface ProductImageInput {
+  url: string;
+  isPrimary: boolean;
+}
+
+export interface CreateProductInput {
+  categoryId: string;
+  title: string;
+  description: string;
+  condition?: ProductCondition;
+  images?: ProductImageInput[];
+}
+
+export interface UpdateProductInput {
+  categoryId?: string;
+  title?: string;
+  description?: string;
+  condition?: ProductCondition;
+  images?: ProductImageInput[];
+  status?: 'DRAFT' | 'READY';
+}
+
+export interface DeleteProductResponse {
+  deleted: boolean;
+}
 
 export interface ProductListParams {
   page?: number;
@@ -59,6 +86,33 @@ export const productApi = {
    */
   async getProduct(id: string): Promise<Product> {
     const res = await apiClient.get<Product>(`/api/products/${id}`);
+    return res.data;
+  },
+
+  /**
+   * Create a new product (starts as DRAFT on backend).
+   * Calls POST /api/products.
+   */
+  async createProduct(input: CreateProductInput): Promise<Product> {
+    const res = await apiClient.post<Product>('/api/products', input);
+    return res.data;
+  },
+
+  /**
+   * Update an existing product (fields, full images array replacement, or DRAFT <-> READY status).
+   * Calls PATCH /api/products/{id}.
+   */
+  async updateProduct(id: string, input: UpdateProductInput): Promise<Product> {
+    const res = await apiClient.patch<Product>(`/api/products/${id}`, input);
+    return res.data;
+  },
+
+  /**
+   * Delete a DRAFT or READY product.
+   * Calls DELETE /api/products/{id}.
+   */
+  async deleteProduct(id: string): Promise<DeleteProductResponse> {
+    const res = await apiClient.delete<DeleteProductResponse>(`/api/products/${id}`);
     return res.data;
   },
 };
