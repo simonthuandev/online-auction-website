@@ -2,9 +2,14 @@ import { apiClient } from './client.ts';
 import type {
   Auction,
   AuctionPage,
+  Bid,
   BidPage,
   AuctionStatus,
 } from '../contracts/api.generated.ts';
+
+export interface PlaceBidInput {
+  amount: string;
+}
 
 export interface AuctionListParams {
   page?: number;
@@ -51,6 +56,27 @@ export const auctionApi = {
     const res = await apiClient.get<BidPage>(`/api/auctions/${id}/bids`, {
       params,
     });
+    return res.data;
+  },
+
+  /**
+   * Place a new bid on an active auction.
+   * Calls POST /api/auctions/{id}/bids with Idempotency-Key header.
+   */
+  async placeBid(
+    id: string,
+    amount: string,
+    idempotencyKey: string
+  ): Promise<Bid> {
+    const res = await apiClient.post<Bid>(
+      `/api/auctions/${id}/bids`,
+      { amount },
+      {
+        headers: {
+          'Idempotency-Key': idempotencyKey,
+        },
+      }
+    );
     return res.data;
   },
 };

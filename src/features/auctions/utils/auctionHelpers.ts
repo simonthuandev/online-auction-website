@@ -1,4 +1,5 @@
-import type { AuctionStatus } from '@/contracts/api.generated';
+import type { AuctionStatus } from '../../../contracts/api.generated.ts';
+import { addVnd, multiplyVnd } from '../../../lib/money.ts';
 
 export const PUBLIC_AUCTION_STATUSES = ['ACTIVE', 'PENDING', 'ENDED'] as const;
 export type PublicAuctionStatus = (typeof PUBLIC_AUCTION_STATUSES)[number];
@@ -148,4 +149,44 @@ export function isUserLeadingBidder(
 ): boolean {
   if (!latestBidderId || !currentUserId) return false;
   return latestBidderId === currentUserId;
+}
+
+/**
+ * Calculates the strict minimum bid allowed per backend business logic:
+ * - If 0 bids have been placed: min = startingPrice
+ * - If >= 1 bids have been placed: min = currentPrice + bidIncrement
+ */
+export function calculateMinimumBid(
+  startingPrice: string,
+  currentPrice: string,
+  bidIncrement: string,
+  hasBids: boolean
+): string {
+  if (!hasBids) {
+    return startingPrice;
+  }
+  return addVnd(currentPrice, bidIncrement);
+}
+
+/**
+ * Calculates quick-step target amounts (+1, +2, +5 steps).
+ */
+export function calculateQuickSteps(
+  startingPrice: string,
+  currentPrice: string,
+  bidIncrement: string,
+  hasBids: boolean
+): { step1: string; step2: string; step5: string } {
+  if (!hasBids) {
+    return {
+      step1: startingPrice,
+      step2: addVnd(startingPrice, multiplyVnd(bidIncrement, 1)),
+      step5: addVnd(startingPrice, multiplyVnd(bidIncrement, 4)),
+    };
+  }
+  return {
+    step1: addVnd(currentPrice, multiplyVnd(bidIncrement, 1)),
+    step2: addVnd(currentPrice, multiplyVnd(bidIncrement, 2)),
+    step5: addVnd(currentPrice, multiplyVnd(bidIncrement, 5)),
+  };
 }

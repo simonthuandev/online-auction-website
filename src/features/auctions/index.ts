@@ -5,6 +5,8 @@ export * from './components/BidHistoryList';
 export * from './components/AuctionStatusBadge';
 export * from './components/AuctionCard';
 export * from './components/AuctionFilters';
+export * from './components/BidBox';
 export * from './hooks/useAuctions';
+export * from './hooks/useAuctionSocket';
 export * from './utils/auctionHelpers';
 export * from './mocks/auctions.mock';
