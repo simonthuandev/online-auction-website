@@ -1,5 +1,5 @@
 import type { AuctionStatus } from '../../../contracts/api.generated.ts';
-import { addVnd, multiplyVnd } from '../../../lib/money.ts';
+import { addVnd, multiplyVnd, isPositiveVnd, isValidVnd } from '../../../lib/money.ts';
 
 export const PUBLIC_AUCTION_STATUSES = ['ACTIVE', 'PENDING', 'ENDED'] as const;
 export type PublicAuctionStatus = (typeof PUBLIC_AUCTION_STATUSES)[number];
@@ -189,4 +189,90 @@ export function calculateQuickSteps(
     step2: addVnd(currentPrice, multiplyVnd(bidIncrement, 2)),
     step5: addVnd(currentPrice, multiplyVnd(bidIncrement, 5)),
   };
+}
+
+/**
+ * Formats a Date object into HTML5 datetime-local input string: YYYY-MM-DDTHH:mm.
+ */
+export function formatDatetimeLocal(date: Date): string {
+  const pad = (n: number) => n.toString().padStart(2, '0');
+  const year = date.getFullYear();
+  const month = pad(date.getMonth() + 1);
+  const day = pad(date.getDate());
+  const hours = pad(date.getHours());
+  const minutes = pad(date.getMinutes());
+  return `${year}-${month}-${day}T${hours}:${minutes}`;
+}
+
+/**
+ * Validates auction schedule dates according to backend business rules:
+ * - startTime must be >= now (with 30s clock skew tolerance)
+ * - endTime must be > startTime
+ */
+export function validateAuctionTime(
+  startTimeInput: string | Date,
+  endTimeInput: string | Date,
+  referenceNowMs?: number
+): { isValid: boolean; error?: string } {
+  const nowMs = referenceNowMs ?? Date.now();
+  const startMs = new Date(startTimeInput).getTime();
+  const endMs = new Date(endTimeInput).getTime();
+
+  if (isNaN(startMs)) {
+    return { isValid: false, error: 'Thời gian bắt đầu không hợp lệ.' };
+  }
+  if (isNaN(endMs)) {
+    return { isValid: false, error: 'Thời gian kết thúc không hợp lệ.' };
+  }
+
+  // Allow 30 seconds tolerance for user typing / clock skew
+  if (startMs < nowMs - 30 * 1000) {
+    return {
+      isValid: false,
+      error: 'Thời gian bắt đầu phải từ thời điểm hiện tại trở đi.',
+    };
+  }
+
+  if (endMs <= startMs) {
+    return {
+      isValid: false,
+      error: 'Thời gian kết thúc phải diễn ra sau thời gian bắt đầu.',
+    };
+  }
+
+  return { isValid: true };
+}
+
+/**
+ * Validates auction prices according to backend CHECK constraints:
+ * - startingPrice > 0 (integer VND string)
+ * - bidIncrement > 0 (integer VND string)
+ */
+export function validateAuctionPrices(
+  startingPrice: string,
+  bidIncrement: string
+): { isValid: boolean; error?: string } {
+  if (!isValidVnd(startingPrice) || !isPositiveVnd(startingPrice)) {
+    return {
+      isValid: false,
+      error: 'Giá khởi điểm phải là số nguyên VND lớn hơn 0.',
+    };
+  }
+
+  if (!isValidVnd(bidIncrement) || !isPositiveVnd(bidIncrement)) {
+    return {
+      isValid: false,
+      error: 'Bước giá phải là số nguyên VND lớn hơn 0.',
+    };
+  }
+
+  return { isValid: true };
+}
+
+/**
+ * Determines whether the auction should poll status every 2 seconds.
+ * Per WEB-AUC-03: Only polls when status is INITIALIZING.
+ */
+export function shouldPollAuctionStatus(status?: AuctionStatus): boolean {
+  return status === 'INITIALIZING';
 }

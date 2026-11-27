@@ -11,6 +11,14 @@ export interface PlaceBidInput {
   amount: string;
 }
 
+export interface CreateAuctionInput {
+  productId: string;
+  startingPrice: string;
+  bidIncrement: string;
+  startTime: string;
+  endTime: string;
+}
+
 export interface AuctionListParams {
   page?: number;
   pageSize?: number;
@@ -77,6 +85,22 @@ export const auctionApi = {
         },
       }
     );
+    return res.data;
+  },
+  /**
+   * Create a new auction for a READY product.
+   * Calls POST /api/auctions with Idempotency-Key header.
+   * Backend returns 202 Accepted with status INITIALIZING.
+   */
+  async createAuction(
+    input: CreateAuctionInput,
+    idempotencyKey: string
+  ): Promise<Auction> {
+    const res = await apiClient.post<Auction>('/api/auctions', input, {
+      headers: {
+        'Idempotency-Key': idempotencyKey,
+      },
+    });
     return res.data;
   },
 };

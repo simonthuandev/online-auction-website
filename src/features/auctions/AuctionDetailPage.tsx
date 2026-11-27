@@ -19,7 +19,6 @@ import {
   RefreshCw,
   ExternalLink,
   ShieldCheck,
-  Info,
   Calendar,
   Tag,
   TrendingUp,
@@ -199,14 +198,14 @@ export const AuctionDetailPage: React.FC = () => {
         </div>
       )}
 
-      {/* Initializing Notice Banner */}
+      {/* Initializing Notice Banner (Rule WEB-AUC-03) */}
       {isInitializing && (
-        <div className="flex items-start gap-3 p-4 bg-sky-50 border border-sky-200 rounded-2xl text-sky-800">
-          <Info className="h-5 w-5 text-sky-600 shrink-0 mt-0.5" />
+        <div className="flex items-start gap-3 p-4 bg-sky-50 border border-sky-200 rounded-2xl text-sky-900 shadow-xs">
+          <RefreshCw className="h-5 w-5 text-sky-600 shrink-0 mt-0.5 animate-spin" />
           <div>
-            <h4 className="font-bold text-sm">Đang khởi tạo phiên</h4>
+            <h4 className="font-bold text-sm">Đang giữ sản phẩm và khởi tạo phiên...</h4>
             <p className="text-xs text-sky-700 mt-0.5">
-              Hệ thống đang giữ sản phẩm và khởi tạo phiên đấu giá. Vui lòng đợi trong giây lát...
+              Hệ thống đang tiến hành giữ sản phẩm (reservation) và chuyển trạng thái phiên đấu giá sang PENDING. Trạng thái phiên sẽ tự động cập nhật ngay khi hoàn tất.
             </p>
           </div>
         </div>
@@ -363,6 +362,12 @@ export const AuctionDetailPage: React.FC = () => {
                 {isEnded && (
                   <span className="text-xs font-bold text-slate-600 px-2.5 py-1 bg-slate-100 rounded-full">
                     Phiên đã kết thúc
+                  </span>
+                )}
+                {isInitializing && (
+                  <span className="text-xs font-bold text-sky-700 px-2.5 py-1 bg-sky-100 rounded-full flex items-center gap-1.5">
+                    <RefreshCw className="h-3 w-3 animate-spin text-sky-600" />
+                    Đang khởi tạo
                   </span>
                 )}
               </div>
