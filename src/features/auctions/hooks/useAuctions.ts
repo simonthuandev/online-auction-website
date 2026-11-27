@@ -1,8 +1,14 @@
-import { useQuery, keepPreviousData } from '@tanstack/react-query';
+import {
+  useQuery,
+  useMutation,
+  useQueryClient,
+  keepPreviousData,
+} from '@tanstack/react-query';
 import {
   auctionApi,
   type AuctionListParams,
   type BidListParams,
+  type CreateAuctionInput,
 } from '@/api/auction.api';
 import type { Auction, AuctionPage, BidPage } from '@/contracts/api.generated';
 
@@ -42,6 +48,15 @@ export function useAuction(id?: string) {
       return await auctionApi.getAuction(id);
     },
     enabled: Boolean(id),
+    refetchInterval: (query) => {
+      // WEB-AUC-03 Rule: When status === 'INITIALIZING', auto poll every 2s
+      // Stops polling when transitioning to PENDING, ACTIVE, or CANCELLED
+      const status = query.state.data?.status;
+      if (status === 'INITIALIZING') {
+        return 2000;
+      }
+      return false;
+    },
     staleTime: 1000 * 5, // 5 seconds
   });
 }
@@ -59,5 +74,32 @@ export function useAuctionBids(id?: string, params?: BidListParams) {
     enabled: Boolean(id),
     placeholderData: keepPreviousData,
     staleTime: 1000 * 5, // 5 seconds
+  });
+}
+
+/**
+ * Mutation hook to create a new auction.
+ * Returns 202 Accepted with status INITIALIZING.
+ */
+export function useCreateAuction() {
+  const queryClient = useQueryClient();
+
+  return useMutation<
+    Auction,
+    Error,
+    { input: CreateAuctionInput; idempotencyKey: string }
+  >({
+    mutationFn: async ({ input, idempotencyKey }) => {
+      return await auctionApi.createAuction(input, idempotencyKey);
+    },
+    onSuccess: (newAuction) => {
+      queryClient.setQueryData(
+        AUCTION_QUERY_KEYS.detail(newAuction.id),
+        newAuction
+      );
+      void queryClient.invalidateQueries({
+        queryKey: AUCTION_QUERY_KEYS.lists(),
+      });
+    },
   });
 }
