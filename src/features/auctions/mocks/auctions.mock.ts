@@ -1,4 +1,4 @@
-import type { Auction, Bid, AuctionPage, BidPage } from '@/contracts/api.generated';
+import type { Auction, Bid, AuctionPage, BidPage } from '../../../contracts/api.generated.ts';
 
 export const mockAuctions: Auction[] = [
   {

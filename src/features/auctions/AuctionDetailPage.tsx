@@ -1,6 +1,8 @@
 import React, { useState, useCallback } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useAuction, useAuctionBids } from './hooks/useAuctions';
+import { useAuctionSocket } from './hooks/useAuctionSocket';
+import { BidBox } from './components/BidBox';
 import { useAppSelector } from '@/store';
 import { formatVnd } from '@/lib/money';
 import { formatLocalTime } from '@/lib/time';
@@ -9,7 +11,6 @@ import { CountdownTimer } from './components/CountdownTimer';
 import { BidHistoryList } from './components/BidHistoryList';
 import { maskBidderId, isUserLeadingBidder } from './utils/auctionHelpers';
 import {
-  Gavel,
   Trophy,
   UserCheck,
   AlertTriangle,
@@ -22,6 +23,8 @@ import {
   Calendar,
   Tag,
   TrendingUp,
+  Sparkles,
+  Radio,
 } from 'lucide-react';
 
 const DEFAULT_IMAGE =
@@ -49,6 +52,17 @@ export const AuctionDetailPage: React.FC = () => {
     data: bidsPage,
     refetch: refetchBids,
   } = useAuctionBids(id, { page: 1, pageSize: 10 });
+
+  // 3. Realtime Socket synchronization
+  const {
+    isPriceUpdated,
+    latestBidderId: socketLatestBidderId,
+    isConnected: isSocketConnected,
+  } = useAuctionSocket({
+    auctionId: auction?.id,
+    currentVersion: auction?.version ?? 0,
+    enabled: Boolean(auction?.id),
+  });
 
   // Countdown timer onZero callback: refetches auction after 1-2s delay to catch phase transition
   const handleCountdownZero = useCallback(() => {
@@ -118,10 +132,10 @@ export const AuctionDetailPage: React.FC = () => {
 
   // Determine Leading Bidder:
   // Per backend specification, OpenAPI Auction does NOT contain leadingBidderId.
-  // Leading bidder is bidsPage?.items?.[0]?.bidderId (since bids are returned sorted newest first).
+  // Leading bidder is the newest bid (socket latest or bidsPage?.items?.[0]?.bidderId).
   const latestBid = bidsPage?.items?.[0];
-  const leadingBidderId = latestBid?.bidderId ?? null;
-  const isLeading = isUserLeadingBidder(leadingBidderId, currentUser?.id);
+  const effectiveLeadingBidderId = socketLatestBidderId || latestBid?.bidderId || null;
+  const isLeading = isUserLeadingBidder(effectiveLeadingBidderId, currentUser?.id);
   const isSeller = Boolean(currentUser?.id && auction.sellerId === currentUser.id);
 
   // Status flags
@@ -143,20 +157,34 @@ export const AuctionDetailPage: React.FC = () => {
 
   return (
     <div className="max-w-6xl mx-auto space-y-8 pb-16">
-      {/* Breadcrumb Navigation */}
-      <nav className="flex items-center gap-2 text-xs text-slate-500">
-        <Link to="/" className="hover:text-slate-900 transition">
-          Trang chủ
-        </Link>
-        <span>/</span>
-        <Link to="/auctions" className="hover:text-slate-900 transition">
-          Phiên đấu giá
-        </Link>
-        <span>/</span>
-        <span className="text-slate-900 font-medium truncate max-w-xs sm:max-w-md">
-          {auction.productTitle ?? 'Chi tiết'}
-        </span>
-      </nav>
+      {/* Breadcrumb Navigation & Realtime Status */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+        <nav className="flex items-center gap-2 text-xs text-slate-500">
+          <Link to="/" className="hover:text-slate-900 transition">
+            Trang chủ
+          </Link>
+          <span>/</span>
+          <Link to="/auctions" className="hover:text-slate-900 transition">
+            Phiên đấu giá
+          </Link>
+          <span>/</span>
+          <span className="text-slate-900 font-medium truncate max-w-xs sm:max-w-md">
+            {auction.productTitle ?? 'Chi tiết'}
+          </span>
+        </nav>
+
+        {/* Realtime Socket Status Pill */}
+        {isActive && (
+          <div className="flex items-center gap-1.5 text-2xs font-semibold px-2.5 py-1 bg-slate-100 rounded-full text-slate-600 self-start sm:self-auto">
+            <Radio
+              className={`h-3 w-3 ${
+                isSocketConnected ? 'text-emerald-500 animate-pulse' : 'text-slate-400'
+              }`}
+            />
+            <span>{isSocketConnected ? 'Realtime kết nối' : 'Đang kết nối socket...'}</span>
+          </div>
+        )}
+      </div>
 
       {/* Cancelled Notice Banner (Rule 10 in plan) */}
       {isCancelled && (
@@ -342,13 +370,29 @@ export const AuctionDetailPage: React.FC = () => {
 
             {/* Pricing Matrix */}
             <div className="space-y-4">
-              {/* Current Price Highlight */}
-              <div className="p-4 sm:p-5 bg-gradient-to-br from-indigo-50/70 via-white to-slate-50 border border-indigo-100/80 rounded-2xl">
-                <div className="text-xs font-medium text-slate-500 mb-1">
-                  {isEnded ? 'Giá chốt phiên (Final Price)' : 'Giá hiện tại'}
+              {/* Current Price Highlight with Socket animation */}
+              <div
+                className={`p-4 sm:p-5 rounded-2xl border transition-all duration-300 ${
+                  isPriceUpdated
+                    ? 'bg-emerald-50 border-emerald-400 ring-2 ring-emerald-400/40 shadow-md'
+                    : 'bg-gradient-to-br from-indigo-50/70 via-white to-slate-50 border-indigo-100/80'
+                }`}
+              >
+                <div className="flex items-center justify-between text-xs font-medium text-slate-500 mb-1">
+                  <span>{isEnded ? 'Giá chốt phiên (Final Price)' : 'Giá hiện tại'}</span>
+                  {isPriceUpdated && (
+                    <span className="inline-flex items-center gap-1 text-2xs font-extrabold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full animate-bounce">
+                      <Sparkles className="h-3 w-3 text-emerald-600" />
+                      Vừa có giá mới!
+                    </span>
+                  )}
                 </div>
                 <div className="flex items-baseline gap-2">
-                  <span className="text-2xl sm:text-3xl font-black text-indigo-600">
+                  <span
+                    className={`text-2xl sm:text-3xl font-black transition-colors ${
+                      isPriceUpdated ? 'text-emerald-700' : 'text-indigo-600'
+                    }`}
+                  >
                     {formatVnd(
                       isEnded
                         ? auction.finalPrice ?? auction.currentPrice ?? '0'
@@ -393,19 +437,19 @@ export const AuctionDetailPage: React.FC = () => {
                 </div>
               )}
 
-              {!isLeading && leadingBidderId && !isEnded && (
+              {!isLeading && effectiveLeadingBidderId && !isEnded && (
                 <div className="flex items-center justify-between p-3.5 bg-slate-50 border border-slate-100 rounded-2xl text-xs text-slate-600">
                   <div className="flex items-center gap-2">
                     <Trophy className="h-4 w-4 text-amber-500" />
                     <span>Người đang dẫn đầu:</span>
                   </div>
                   <span className="font-bold text-slate-800">
-                    {maskBidderId(leadingBidderId, currentUser?.id)}
+                    {maskBidderId(effectiveLeadingBidderId, currentUser?.id)}
                   </span>
                 </div>
               )}
 
-              {!leadingBidderId && !isEnded && (
+              {!effectiveLeadingBidderId && !isEnded && (
                 <div className="p-3 bg-slate-50 border border-slate-100 rounded-2xl text-xs text-slate-500 text-center">
                   Chưa có lượt đặt giá nào. Giá hiện tại bằng giá khởi điểm.
                 </div>
@@ -433,43 +477,22 @@ export const AuctionDetailPage: React.FC = () => {
                 </div>
               )}
             </div>
-
-            {/* Bidding notice / Guest prompt */}
-            {!currentUser && isActive && (
-              <div className="p-4 bg-amber-50 border border-amber-200 rounded-2xl text-center space-y-2">
-                <p className="text-xs text-amber-800">
-                  Bạn cần đăng nhập để tham gia đặt giá trong phiên đấu giá này.
-                </p>
-                <Link
-                  to={`/login?redirect=/auctions/${auction.id}`}
-                  className="inline-flex items-center justify-center gap-1.5 w-full py-2 px-4 bg-indigo-600 text-white text-xs font-semibold rounded-xl hover:bg-indigo-700 transition"
-                >
-                  Đăng nhập để đặt giá
-                </Link>
-              </div>
-            )}
-
-            {isSeller && (
-              <div className="p-3 bg-slate-100 text-slate-600 text-xs rounded-xl text-center">
-                Bạn là người bán của phiên đấu giá này (không được tham gia đặt giá).
-              </div>
-            )}
-
-            {/* Preparation notice for WEB-AUC-02 */}
-            {currentUser && !isSeller && isActive && (
-              <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-center text-xs text-slate-500">
-                <span className="inline-flex items-center gap-1.5 font-semibold text-slate-700">
-                  <Gavel className="h-4 w-4 text-indigo-600" />
-                  Mức giá tối thiểu lượt kế tiếp:{' '}
-                  {latestBid
-                    ? formatVnd(
-                        (BigInt(auction.currentPrice) + BigInt(auction.bidIncrement)).toString()
-                      )
-                    : formatVnd(auction.startingPrice)}
-                </span>
-              </div>
-            )}
           </div>
+
+          {/* Realtime Bid Box (WEB-AUC-02) */}
+          <BidBox
+            auction={auction}
+            latestBidderId={effectiveLeadingBidderId}
+            totalBids={bidsPage?.total ?? (latestBid ? 1 : 0)}
+            onBidSuccess={() => {
+              void refetchAuction();
+              void refetchBids();
+            }}
+            onOutbidRefetch={() => {
+              void refetchAuction();
+              void refetchBids();
+            }}
+          />
         </div>
       </div>
 
