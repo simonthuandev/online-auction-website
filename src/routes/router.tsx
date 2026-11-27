@@ -11,6 +11,7 @@ import { LoginPage } from '@/features/auth/LoginPage';
 import { RegisterPage } from '@/features/auth/RegisterPage';
 import { ProfilePage } from '@/features/auth/ProfilePage';
 import { OrderListPage } from '@/features/orders/OrderListPage';
+import { OrderDetailPage } from '@/features/orders/OrderDetailPage';
 import { NotificationPage } from '@/features/notifications/NotificationPage';
 import { AdminDashboardPage } from '@/features/admin/AdminDashboardPage';
 import { SellerProductsPage } from '@/features/products/seller/SellerProductsPage';
@@ -70,6 +71,14 @@ export const router = createBrowserRouter([
         element: (
           <ProtectedRoute>
             <OrderListPage />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: 'orders/:id',
+        element: (
+          <ProtectedRoute>
+            <OrderDetailPage />
           </ProtectedRoute>
         ),
       },
