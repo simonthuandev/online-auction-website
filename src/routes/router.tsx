@@ -7,6 +7,7 @@ import { HomePage } from '@/features/home/HomePage';
 import { ProductListPage } from '@/features/products/ProductListPage';
 import { ProductDetailPage } from '@/features/products/ProductDetailPage';
 import { AuctionListPage } from '@/features/auctions/AuctionListPage';
+import { AuctionDetailPage } from '@/features/auctions/AuctionDetailPage';
 import { LoginPage } from '@/features/auth/LoginPage';
 import { RegisterPage } from '@/features/auth/RegisterPage';
 import { ProfilePage } from '@/features/auth/ProfilePage';
@@ -39,6 +40,10 @@ export const router = createBrowserRouter([
       {
         path: 'auctions',
         element: <AuctionListPage />,
+      },
+      {
+        path: 'auctions/:id',
+        element: <AuctionDetailPage />,
       },
       // Auth routes (Anonymous only)
       {
